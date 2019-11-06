@@ -1,7 +1,8 @@
+// @ts-check
 // Module ui/about-respec
 // A simple about dialog with pointer to the help
 import { l10n, lang } from "../core/l10n.js";
-import hyperHTML from "hyperhtml";
+import { hyperHTML } from "../core/import-maps.js";
 import { ui } from "../core/ui.js";
 
 // window.respecVersion is added at build time (see tools/builder.js)
@@ -27,11 +28,10 @@ function show() {
       .getEntriesByType("measure")
       .sort((a, b) => b.duration - a.duration)
       .map(({ name, duration }) => {
-        const fixedSize = duration.toFixed(2);
         const humanDuration =
-          fixedSize > 1000
-            ? `${Math.round(fixedSize / 1000.0)} second(s)`
-            : `${fixedSize} milliseconds`;
+          duration > 1000
+            ? `${Math.round(duration / 1000.0)} second(s)`
+            : `${duration.toFixed(2)} milliseconds`;
         return { name, duration: humanDuration };
       })
       .map(perfEntryToTR)
@@ -76,7 +76,7 @@ function perfEntryToTR({ name, duration }) {
       </a>
     </td>
     <td>
-      ${duration} 
+      ${duration}
     </td>
   `;
 }

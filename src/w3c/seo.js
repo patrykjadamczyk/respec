@@ -1,3 +1,4 @@
+// @ts-check
 // Module w3c/seo
 // Manages SEO information for documents
 // e.g. set the canonical URL for the document if configured
@@ -5,6 +6,16 @@ import { biblio } from "../core/biblio.js";
 import { pub } from "../core/pubsubhub.js";
 export const name = "w3c/seo";
 export function run(conf) {
+  // Don't include a canonical URL for documents
+  // that haven't been published.
+  if (!conf.canonicalURI) {
+    switch (conf.specStatus) {
+      case "CG-DRAFT":
+      case "BG-DRAFT":
+      case "unofficial":
+        return;
+    }
+  }
   const trLatestUri = conf.shortName
     ? `https://www.w3.org/TR/${conf.shortName}/`
     : null;
@@ -88,6 +99,7 @@ async function addJSONLDInfo(conf, doc) {
     inLanguage: doc.documentElement.lang || "en",
     license: conf.licenseInfo.url,
     datePublished: conf.dashDate,
+    /** @type {{ name: string, url?: string } | { name: string, url?: string }[]} */
     copyrightHolder: {
       name: "World Wide Web Consortium",
       url: "https://www.w3.org/",

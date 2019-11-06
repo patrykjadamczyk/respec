@@ -1,3 +1,4 @@
+// @ts-check
 // Module core/utils
 // As the name implies, this contains a ragtag gang of methods that just don't fit
 // anywhere else.
@@ -117,7 +118,7 @@ export function removeReSpec(doc) {
 
 /**
  * Adds error class to each element while emitting a warning
- * @param {Element|Element[]} elems
+ * @param {HTMLElement|HTMLElement[]} elems
  * @param {String} msg message to show in warning
  * @param {String=} title error message to add on each element
  */
@@ -135,7 +136,7 @@ export function showInlineWarning(elems, msg, title) {
 
 /**
  * Adds error class to each element while emitting a warning
- * @param {Element|Element[]} elems
+ * @param {HTMLElement|HTMLElement[]} elems
  * @param {String} msg message to show in warning
  * @param {String} title error message to add on each element
  * @param {object} [options]
@@ -159,7 +160,7 @@ export function showInlineError(elems, msg, title, { details } = {}) {
 
 /**
  * Adds error class to each element while emitting a warning
- * @param {Element} elem
+ * @param {HTMLElement} elem
  * @param {String} msg message to show in warning
  * @param {String=} title error message to add on each element
  */
@@ -183,7 +184,7 @@ function generateMarkdownLink(element, i) {
 
 export class IDBKeyVal {
   /**
-   * @param {import("idb").DB} idb
+   * @param {import("idb").IDBPDatabase} idb
    * @param {string} storeName
    */
   constructor(idb, storeName) {
@@ -201,15 +202,15 @@ export class IDBKeyVal {
 
   /**
    * @param {string[]} keys
-   * @returns {[string, any][]}
    */
   async getMany(keys) {
     const keySet = new Set(keys);
-    const results = [];
+    /** @type {Map<string, any>} */
+    const results = new Map();
     let cursor = await this.idb.transaction(this.storeName).store.openCursor();
     while (cursor) {
       if (keySet.has(cursor.key)) {
-        results.push([cursor.key, cursor.value]);
+        results.set(cursor.key, cursor.value);
       }
       cursor = await cursor.continue();
     }
@@ -223,7 +224,7 @@ export class IDBKeyVal {
   async set(key, value) {
     const tx = this.idb.transaction(this.storeName, "readwrite");
     tx.objectStore(this.storeName).put(value, key);
-    return await tx.complete;
+    return await tx.done;
   }
 
   async addMany(entries) {
@@ -231,20 +232,20 @@ export class IDBKeyVal {
     for (const [key, value] of entries) {
       tx.objectStore(this.storeName).put(value, key);
     }
-    return await tx.complete;
+    return await tx.done;
   }
 
   async clear() {
     const tx = this.idb.transaction(this.storeName, "readwrite");
     tx.objectStore(this.storeName).clear();
-    return await tx.complete;
+    return await tx.done;
   }
 
   async keys() {
     const tx = this.idb.transaction(this.storeName);
-    /** @type {string[]} */
+    /** @type {Promise<string[]>} */
     const keys = tx.objectStore(this.storeName).getAllKeys();
-    await tx.complete;
+    await tx.done;
     return keys;
   }
 }
@@ -386,6 +387,10 @@ export function linkCSS(doc, styles) {
 // Please note that this is a legacy method that is only kept in order
 // to maintain compatibility
 // with RSv1. It is therefore not tested and not actively supported.
+/**
+ * @this {any}
+ * @param {string} [flist]
+ */
 export function runTransforms(content, flist) {
   let args = [this, content];
   const funcArgs = Array.from(arguments);
@@ -396,10 +401,12 @@ export function runTransforms(content, flist) {
     const methods = flist.split(/\s+/);
     for (let j = 0; j < methods.length; j++) {
       const meth = methods[j];
-      if (window[meth]) {
+      /** @type {any} */
+      const method = window[meth];
+      if (method) {
         // the initial call passed |this| directly, so we keep it that way
         try {
-          content = window[meth].apply(this, args);
+          content = method.apply(this, args);
         } catch (e) {
           pub(
             "warn",
@@ -490,7 +497,7 @@ export function flatten(collector, item) {
 /**
  * Creates and sets an ID to an element (elem)
  * using a specific prefix if provided, and a specific text if given.
- * @param {Element} elem element
+ * @param {HTMLElement} elem element
  * @param {String} pfx prefix
  * @param {String} txt text
  * @param {Boolean} noLC do not convert to lowercase
@@ -539,6 +546,7 @@ export function addId(elem, pfx = "", txt = "", noLC = false) {
  * Returns all the descendant text nodes of an element.
  * @param {Node} el
  * @param {string[]} exclusions node localName to exclude
+ * @param {object} options
  * @param {boolean} options.wsNodes if nodes that only have whitespace are returned.
  * @returns {Text[]}
  */
@@ -577,52 +585,36 @@ export function getTextNodes(el, exclusions = [], options = { wsNodes: true }) {
  * This method now *prefers* the data-lt attribute for the list of
  *   titles. That attribute is added by this method to dfn elements, so
  *   subsequent calls to this method will return the data-lt based list.
- * @param {Element} elem
- * @param {Object} args
- * @param {boolean} [args.isDefinition]
+ * @param {HTMLElement} elem
  * @returns {String[]} array of title strings
  */
-export function getDfnTitles(elem, { isDefinition = false } = {}) {
-  let titleString = "";
-  let normText = "";
+export function getDfnTitles(elem) {
+  const titleSet = new Set();
   // data-lt-noDefault avoid using the text content of a definition
   // in the definition list.
-  if (!elem.hasAttribute("data-lt-noDefault")) {
-    normText = norm(elem.textContent).toLowerCase();
-  }
+  // ltNodefault is === "data-lt-noDefault"... someone screwed up 😖
+  const normText = "ltNodefault" in elem.dataset ? "" : norm(elem.textContent);
+  const child = /** @type {HTMLElement | undefined} */ (elem.children[0]);
   if (elem.dataset.lt) {
     // prefer @data-lt for the list of title aliases
-    titleString = elem.dataset.lt.toLowerCase();
-    if (normText !== "" && !titleString.startsWith(`${normText}|`)) {
-      // Use the definition itself, so to avoid having to declare the definition twice.
-      titleString += `|${normText}`;
-    }
+    elem.dataset.lt
+      .split("|")
+      .map(item => norm(item))
+      .forEach(item => titleSet.add(item));
   } else if (
     elem.childNodes.length === 1 &&
     elem.getElementsByTagName("abbr").length === 1 &&
-    elem.children[0].title
+    child.title
   ) {
-    titleString = elem.children[0].title;
-  } else {
-    titleString =
-      elem.textContent === '""' ? "the-empty-string" : elem.textContent;
+    titleSet.add(child.title);
+  } else if (elem.textContent === '""') {
+    titleSet.add("the-empty-string");
   }
 
-  // now we have a string of one or more titles
-  titleString = norm(titleString).toLowerCase();
-  if (isDefinition) {
-    if (elem.dataset.lt) {
-      elem.dataset.lt = titleString;
-    }
-    // if there is no pre-defined type, assume it is a 'dfn'
-    if (!elem.dataset.dfnType) elem.dataset.dfnType = "dfn";
-  }
-
-  const titles = titleString
-    .split("|")
-    .filter(item => item !== "")
-    .reduce((collector, item) => collector.add(item), new Set());
-  return [...titles];
+  titleSet.add(normText);
+  titleSet.delete("");
+  const titles = [...titleSet];
+  return titles;
 }
 
 /**
@@ -638,25 +630,29 @@ export function getDfnTitles(elem, { isDefinition = false } = {}) {
  *  * {for: "int2", title: "int3.member"}
  *  * {for: "int3", title: "member"}
  *  * {for: "", title: "int3.member"}
- * @param {Element} elem
+ * @param {HTMLElement} elem
  * @returns {LinkTarget[]}
  */
 export function getLinkTargets(elem) {
+  /** @type {HTMLElement} */
   const linkForElem = elem.closest("[data-link-for]");
-  const linkFor = linkForElem ? linkForElem.dataset.linkFor.toLowerCase() : "";
+  const linkFor = linkForElem ? linkForElem.dataset.linkFor : "";
   const titles = getDfnTitles(elem);
-
-  return titles.reduce((result, title) => {
-    result.push({ for: linkFor, title });
+  const results = titles.reduce((result, title) => {
+    // supports legacy <dfn>Foo.Bar()</dfn> definitions
     const split = title.split(".");
     if (split.length === 2) {
       // If there are multiple '.'s, this won't match an
       // Interface/member pair anyway.
       result.push({ for: split[0], title: split[1] });
     }
-    result.push({ for: "", title });
+    result.push({ for: linkFor, title });
+
+    // Finally, we can try to match without link for
+    if (linkFor !== "") result.push({ for: "", title });
     return result;
   }, []);
+  return results;
 }
 
 /**
@@ -704,7 +700,7 @@ export function refTypeFromContext(ref, element) {
 /**
  * Wraps inner contents with the wrapper node
  * @param {Node} outer outer node to be modified
- * @param {Node} wrapper wrapper node to be appended
+ * @param {Element} wrapper wrapper node to be appended
  */
 export function wrapInner(outer, wrapper) {
   wrapper.append(...outer.childNodes);
@@ -738,6 +734,7 @@ export function parents(element, selector) {
  * Note that this doesn't support comma separated selectors.
  * @param {Element} element
  * @param {string} selector
+ * @returns {NodeListOf<HTMLElement>}
  */
 export function children(element, selector) {
   try {
@@ -750,6 +747,7 @@ export function children(element, selector) {
       element.id = tempId;
     }
     const query = `#${element.id} > ${selector}`;
+    /** @type {NodeListOf<HTMLElement>} */
     const elements = element.parentElement.querySelectorAll(query);
     if (tempId) {
       element.id = "";
@@ -762,7 +760,7 @@ export function children(element, selector) {
  * Generates simple ids. The id's increment after it yields.
  *
  * @param {String} namespace A string like "highlight".
- * @param {Int} counter A number, which can start at a given value.
+ * @param {number} counter A number, which can start at a given value.
  */
 export function msgIdGenerator(namespace, counter = 0) {
   function* idGenerator(namespace, counter) {

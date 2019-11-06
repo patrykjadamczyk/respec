@@ -1,3 +1,4 @@
+// @ts-check
 // Module core/requirements
 // This module does two things:
 //
@@ -9,7 +10,7 @@
 // 2.  It allows referencing requirements by their ID simply using an empty <a>
 //     element with its href pointing to the requirement it should be referencing
 //     and a class of "reqRef".
-import hyperHTML from "hyperhtml";
+import { hyperHTML } from "./import-maps.js";
 import { pub } from "./pubsubhub.js";
 
 export const name = "core/requirements";

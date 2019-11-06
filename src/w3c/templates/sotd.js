@@ -1,4 +1,5 @@
-import html from "hyperhtml";
+// @ts-check
+import { hyperHTML as html } from "../../core/import-maps.js";
 
 export default (conf, opts) => {
   return html`

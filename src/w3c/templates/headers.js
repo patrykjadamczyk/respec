@@ -1,12 +1,12 @@
 // @ts-check
-import html from "hyperhtml";
+import { hyperHTML as html } from "../../core/import-maps.js";
 import { norm } from "../../core/utils.js";
 import { pub } from "../../core/pubsubhub.js";
 import showLink from "./show-link.js";
 import showLogo from "./show-logo.js";
 import showPeople from "./show-people.js";
 
-const ccLicense = "https://creativecommons.org/licenses/by/3.0/";
+const ccLicense = "https://creativecommons.org/licenses/by/4.0/";
 const w3cLicense = "https://www.w3.org/Consortium/Legal/copyright-documents";
 const legalDisclaimer =
   "https://www.w3.org/Consortium/Legal/ipr-notice#Legal_Disclaimer";
@@ -218,7 +218,7 @@ function renderCopyright(conf) {
           <p class="copyright">
             This document is licensed under a
             ${linkLicense(
-              "Creative Commons Attribution 3.0 License",
+              "Creative Commons Attribution 4.0 License",
               ccLicense,
               "subfoot"
             )}.
